@@ -1,12 +1,20 @@
-# SARA - Cuaderno Digital de Gestión Docente y Automatización del Rendimiento Académico
+# Sistema SARA
 
-Este proyecto está desarrollado bajo Eclipse IDE y utiliza Maven para la gestión de dependencias y MySQL Workbench para la base de datos. Está configurado para ser ejecutado automáticamente con un solo clic.
+SARA es un cuaderno digital diseñado para que los maestros ahorren tiempo en el registro y cálculo de calificaciones. El proyecto está hecho en Eclipse IDE con Maven y MySQL Workbench. 
 
-### Requisitos previos:
-1. Tener **MySQL Workbench** activo y corriendo localmente en el puerto 3306.
-2. Tener configuradas las variables de entorno de **Java** y **Maven** en el sistema operativo.
+¡Está configurado para que lo puedas ejecutar en tu computadora con un solo clic!
 
-### Cómo ejecutar (Un solo clic):
-1. Descarga el repositorio como un archivo ZIP y descomprímelo.
-2. Haz doble clic en el archivo **`ejecutar.bat`** que se encuentra en la carpeta raíz.
-3. Introduce tu usuario y contraseña de MySQL Workbench cuando el script te lo solicite. El asistente creará la base de datos de manera automática, importará las tablas desde el archivo `schema.sql` e iniciará la aplicación Java de inmediato sin que debas configurar nada dentro de Eclipse.
+### ⚙️ Lo que necesitas tener listo:
+* **MySQL Workbench** activo y corriendo en su puerto normal (3306).
+* **Java** y **Maven** configurados en tu sistema.
+
+### 🚀 Cómo ejecutarlo:
+1. Descarga el proyecto como **ZIP** y descomprímelo.
+2. Abre la carpeta y haz doble clic en el archivo **`ejecutar.bat`**.
+3. El asistente te pedirá de forma amigable tu usuario y contraseña local de MySQL para montar la base de datos automáticamente, e iniciará el sistema de inmediato.
+
+### 🔑 Cuentas para probar el sistema:
+Cuando se abra la pantalla de login, puedes entrar usando cualquiera de estos dos accesos precargados:
+
+* **Administrador:** usuario: `admin` | contraseña: `admin123`
+* **Docente:** usuario: `docente` | contraseña: `docente123`
