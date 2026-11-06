@@ -1,0 +1,90 @@
+SARA - Cuaderno Digital de Gestion Docente        (version 5)
+
+======================================================================
+COMO SE CALCULA LA NOTA (evaluacion por cortes del MINED)
+======================================================================
+Hay 4 cortes evaluativos al año (dos por semestre): I, II, III y IV Corte.
+
+1) NOTA DEL CORTE = suma de los puntos de sus actividades.
+   El porcentaje de cada actividad es su maximo de puntos, y los de un corte suman 100.
+   Una actividad de 10% se califica de 0 a 10; una de 30%, de 0 a 30.
+      Ejemplo: 8 + 13 + 22 + 20 + 15 = 78  -> nivel AS
+
+2) APORTE A LA NOTA FINAL = nota del corte x 25 / 100.
+   Cada corte pesa 25 % de la nota final (tope de 25 puntos).
+   Con 78 en el corte, aporta 19.5. Con 100, aporta 25.
+
+3) NOTA FINAL = suma de los aportes de los 4 cortes (igual al promedio de los 4 cortes).
+   Solo existe cuando los 4 cortes tienen nota. Mientras falte alguno, la nota final
+   dice "En proceso" y se muestra el Acumulado (puntos de la final que lleva hasta ahora).
+
+Nivel de logro (corte y final):  AA 90-100 | AS 76-89 | AF 60-75 | AI menos de 60
+Una asignatura se aprueba con nota final de 60 o mas (nivel AF como minimo).
+
+======================================================================
+INSTALACION
+======================================================================
+1) Base de datos: ejecutar en MySQL Workbench, en este orden:
+     sql/01_sara_esquema.sql        (crea la base "sara", tablas y catalogos, con los 4 cortes)
+     sql/02_sara_datos_prueba.sql   (opcional: 5 estudiantes de Septimo A con 4 cortes de Matematica)
+     sql/03_sara_consultas.sql      (opcional: las consultas SQL del sistema, para estudiarlas)
+
+   SI YA TIENE LA BASE DE LA VERSION ANTERIOR y no quiere perder sus datos:
+   NO ejecute el 01. Ejecute solo:
+     sql/04_sara_migracion_v5.sql
+   Agrega el IV Corte, convierte los datos de ejemplo viejos de Septimo A a puntos
+   y recalcula todas las notas. Sus notas de otros grupos (por ejemplo Segundo C) se
+   conservan; solo cambia su total. Se puede ejecutar mas de una vez.
+
+2) En Eclipse: File > Import > Maven > Existing Maven Projects > carpeta de este proyecto.
+   Eclipse descarga solo las librerias (MySQL, Apache POI y OpenPDF). Necesita internet la primera vez.
+
+3) Abrir src/main/java/sara/util/ConexionBD.java y poner la clave de MySQL propia en CLAVE.
+   (Este ZIP trae CLAVE vacia: hay que escribirla otra vez.)
+
+4) Ejecutar sara/Main.java (clic derecho > Run As > Java Application).
+
+Usuarios de prueba:
+   docente / docente123   -> grupos, estudiantes, evaluaciones, notas, consultas y reportes
+   admin   / admin123     -> cuentas, asignaturas, grupos y respaldos
+
+======================================================================
+QUE HAY DE NUEVO EN LA VERSION 5
+======================================================================
+- IV Corte y nota final por cortes (25 % cada uno).
+- La nota de cada actividad va de 0 hasta su porcentaje (ya no deja poner 25 en una de 10).
+- Registro de notas: columnas Total (de 100), Aporte (de 25) y Nivel. Ya no hay promedio.
+- Resultados > "Boletín de la sección": cada estudiante con I, II, III y IV Corte,
+  Acumulado, Nota final, Nivel (AA/AS/AF/AI) y Resultado (Aprobada/Reprobada).
+- Resultados > "Boletín de un estudiante": escribir su codigo o nombre en el cuadro
+  "Estudiante" y se ven todas sus asignaturas con sus cortes y su nota final.
+- Al modificar o eliminar una actividad, los totales del corte se recalculan solos.
+- No se puede bajar el maximo de una actividad por debajo de una nota ya escrita.
+- El resumen de Rendimiento solo cuenta asignaturas con los 4 cortes ya calificados.
+
+======================================================================
+GUION PARA LA DEMOSTRACION EN VIVO (entrar como docente)
+======================================================================
+1. Crear una seccion nueva:   boton 1 > "Agregar seccion" > Septimo grado, nombre C.
+2. Registrar estudiantes:     boton 2 > "Nuevo estudiante" (grado Septimo, seccion C).
+                              Despues de guardar uno, el sistema pregunta si desea
+                              registrar otro en el mismo grupo: responder Si.
+3. Configurar actividades:    boton 3 > elegir Septimo / C / una asignatura / I Corte >
+                              "Cargar actividades" > "Agregar actividad".
+                              Los porcentajes del corte deben sumar 100 (cada porcentaje
+                              es el maximo de puntos de esa actividad).
+4. Registrar notas:           boton 4 > mismos filtros > "Cargar".
+                              Escribir los puntos de cada estudiante (Enter), o usar
+                              "Nota a todo el grupo". El total, el aporte y el nivel se
+                              calculan solos. Presionar "Guardar notas".
+                              Repetir con II, III y IV Corte para completar la nota final.
+5. Ver resultados:            boton 5 > Calificaciones, Ranking, Alumnos en riesgo,
+                              Boletin de la seccion, Boletin de un estudiante o Rendimiento
+                              > Exportar a Excel / PDF.
+
+Para ver el boletin completo ya listo: ejecutar el script 02 y consultar Septimo A, "Boletín de la sección".
+E-005 no tiene IV Corte, asi que sale "En proceso".
+
+Para demostrar la conexion con la base de datos: en MySQL Workbench ejecutar
+   SELECT * FROM nota;   y   SELECT * FROM calificacion;
+despues de guardar las notas, y se ven los datos recien guardados.
