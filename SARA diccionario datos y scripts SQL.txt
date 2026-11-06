@@ -1,0 +1,832 @@
+================================================================================================
+SARA - Cuaderno Digital de Gestion Docente y Automatizacion del Rendimiento Academico
+DICCIONARIO DE DATOS Y SCRIPTS DE LA BASE DE DATOS (MySQL 8 / InnoDB / utf8mb4)
+Elaborado por: Elvin Joel Urbina Jiron, Jaime Jamir Suarez y Denis Javier Vilchez Guerrero
+Universidad Nacional de Ingenieria (UNI) - Ingenieria en Computacion
+Asignatura: Algoritmizacion y Estructuras de Datos - Docente: Yahaira Altamirano - 2026
+================================================================================================
+
+Este archivo es el Anexo D del reporte del proyecto y contiene dos partes:
+  Parte 1: Diccionario de datos de las doce tablas de la base "sara".
+  Parte 2: Los cuatro scripts SQL completos, en el orden en que deben ejecutarse.
+
+Conversion de la nota (normativa de evaluacion del MINED):
+  - Nota del corte = suma de los puntos de las actividades (0 a 100).
+  - Aporte de cada corte a la nota final = nota del corte x 25 / 100.
+  - Nota final = suma de los aportes de los 4 cortes (equivale al promedio de los 4).
+  - Niveles de logro: AA 90-100 | AS 76-89 | AF 60-75 | AI menos de 60.
+
+================================================================================
+PARTE 1. DICCIONARIO DE DATOS
+================================================================================
+
+--------------------------------------------------------------------------------
+TABLA usuario: Docentes y administradores que usan el sistema.
+--------------------------------------------------------------------------------
+Campo               Tipo                                    Restriccion                       Descripcion
+--------------------------------------------------------------------------------
+id_usuario          INT AUTO_INCREMENT                      PK AUTO_INC                       Identificador del usuario (numeracion automatica).
+nombres             VARCHAR(80)                             NOT NULL                          Nombres de la persona.
+apellidos           VARCHAR(80)                             NOT NULL                          Apellidos de la persona.
+usuario             VARCHAR(30)                             NOT NULL UNIQUE                   Nombre de usuario para iniciar sesion (unico).
+clave               CHAR(64)                                NOT NULL                          Clave cifrada como hash SHA-256 (64 caracteres).
+rol                 ENUM('ADMINISTRADOR','DOCENTE')         NOT NULL                          Permisos de la cuenta: ADMINISTRADOR o DOCENTE.
+activo              TINYINT(1)                              NOT NULL DEF 1                    Estado de la cuenta: 1 = activa, 0 = inactiva.
+
+--------------------------------------------------------------------------------
+TABLA grado: Catalogo de grados del centro (primaria de 1ro a 6to y secundaria de 7mo a 11mo).
+--------------------------------------------------------------------------------
+Campo               Tipo                                    Restriccion                       Descripcion
+--------------------------------------------------------------------------------
+id_grado            INT AUTO_INCREMENT                      PK AUTO_INC                       Identificador del grado.
+nombre              VARCHAR(40)                             NOT NULL UNIQUE                   Nombre del grado (por ejemplo, 'Septimo grado').
+
+--------------------------------------------------------------------------------
+TABLA seccion: Secciones de cada grado (A y B).
+--------------------------------------------------------------------------------
+Campo               Tipo                                    Restriccion                       Descripcion
+--------------------------------------------------------------------------------
+id_seccion          INT AUTO_INCREMENT                      PK AUTO_INC                       Identificador de la seccion.
+id_grado            INT                                     NOT NULL FK -> grado              Grado al que pertenece la seccion.
+nombre              VARCHAR(10)                             NOT NULL                          Letra o nombre de la seccion (A, B, ...).
+                                                            UNIQUE (id_grado, nombre),        
+
+--------------------------------------------------------------------------------
+TABLA estudiante: Datos personales de los estudiantes que registra el docente.
+--------------------------------------------------------------------------------
+Campo               Tipo                                    Restriccion                       Descripcion
+--------------------------------------------------------------------------------
+id_estudiante       INT AUTO_INCREMENT                      PK AUTO_INC                       Identificador del estudiante.
+codigo              VARCHAR(20)                             NOT NULL UNIQUE                   Codigo escolar del estudiante (por ejemplo, 'E-001').
+nombres             VARCHAR(80)                             NOT NULL                          Nombres del estudiante.
+apellidos           VARCHAR(80)                             NOT NULL                          Apellidos del estudiante.
+sexo                ENUM('M','F')                           NOT NULL                          Sexo del estudiante: M o F.
+fecha_nacimiento    DATE                                                                      Fecha de nacimiento.
+direccion           VARCHAR(200)                                                              Direccion de vivienda.
+telefono            VARCHAR(20)                                                               Telefono de contacto.
+id_usuario          INT                                     NOT NULL FK -> usuario            Usuario (docente) que registro al estudiante.
+
+--------------------------------------------------------------------------------
+TABLA asignatura: Catalogo de asignaturas con su regimen.
+--------------------------------------------------------------------------------
+Campo               Tipo                                    Restriccion                       Descripcion
+--------------------------------------------------------------------------------
+id_asignatura       INT AUTO_INCREMENT                      PK AUTO_INC                       Identificador de la asignatura.
+nombre              VARCHAR(60)                             NOT NULL                          Nombre de la asignatura (por ejemplo, 'Matematica').
+regimen             VARCHAR(30)                             NOT NULL                          Regimen de la asignatura: Primaria o Secundaria (puede cambiar si es semestral).
+                                                            UNIQUE (nombre, regimen)          
+
+--------------------------------------------------------------------------------
+TABLA corte: Los cuatro cortes evaluativos del ano lectivo.
+--------------------------------------------------------------------------------
+Campo               Tipo                                    Restriccion                       Descripcion
+--------------------------------------------------------------------------------
+id_corte            INT AUTO_INCREMENT                      PK AUTO_INC                       Identificador del corte.
+nombre              VARCHAR(30)                             NOT NULL UNIQUE                   Nombre del corte: I, II, III o IV Corte.
+descripcion         VARCHAR(100)                                                              Descripcion breve del corte.
+
+--------------------------------------------------------------------------------
+TABLA matricula: Une al estudiante con un grado, una seccion y un ano lectivo.
+--------------------------------------------------------------------------------
+Campo               Tipo                                    Restriccion                       Descripcion
+--------------------------------------------------------------------------------
+id_matricula        INT AUTO_INCREMENT                      PK AUTO_INC                       Identificador de la matricula.
+id_estudiante       INT                                     NOT NULL FK -> estudiante         Estudiante matriculado.
+id_grado            INT                                     NOT NULL FK -> grado              Grado de la matricula.
+id_seccion          INT                                     NOT NULL FK -> seccion            Seccion de la matricula.
+anio_lectivo        SMALLINT                                NOT NULL                          Ano lectivo de la matricula (por ejemplo, 2026).
+modalidad           VARCHAR(30)                             NOT NULL DEF 'Regular'            Modalidad: Regular o Sabatina.
+fecha_matricula     DATE                                    NOT NULL                          Fecha en que se realizo la matricula.
+estado              ENUM('ACTIVA','RETIRADA')               NOT NULL DEF 'ACTIVA'             Estado: ACTIVA o RETIRADA (dar de baja cambia el estado, no borra).
+                                                            UNIQUE (id_estudiante, anio_lectivo),
+
+--------------------------------------------------------------------------------
+TABLA actividad: Actividad evaluativa que crea el docente para un grupo, asignatura y corte.
+--------------------------------------------------------------------------------
+Campo               Tipo                                    Restriccion                       Descripcion
+--------------------------------------------------------------------------------
+id_actividad        INT AUTO_INCREMENT                      PK AUTO_INC                       Identificador de la actividad.
+id_usuario          INT                                     NOT NULL FK -> usuario            Docente que creo la actividad.
+id_asignatura       INT                                     NOT NULL FK -> asignatura         Asignatura que se evalua.
+id_grado            INT                                     NOT NULL FK -> grado              Grado del grupo.
+id_seccion          INT                                     NOT NULL FK -> seccion            Seccion del grupo.
+id_corte            INT                                     NOT NULL FK -> corte              Corte evaluativo al que pertenece.
+anio_lectivo        SMALLINT                                NOT NULL                          Ano lectivo de la actividad.
+nombre              VARCHAR(80)                             NOT NULL                          Nombre de la actividad (por ejemplo, 'Quiz 1', 'Tarea', 'Examen').
+porcentaje          DECIMAL(5,2)                            NOT NULL                          Porcentaje de la actividad dentro del corte; es a la vez su maximo de puntos.
+fecha               DATE                                                                      Fecha prevista de la actividad.
+                                                            CHECK (porcentaje > 0 AND porcentaje <= 100),
+
+--------------------------------------------------------------------------------
+TABLA calificacion: Puntaje que obtiene un estudiante en una actividad.
+--------------------------------------------------------------------------------
+Campo               Tipo                                    Restriccion                       Descripcion
+--------------------------------------------------------------------------------
+id_calificacion     INT AUTO_INCREMENT                      PK AUTO_INC                       Identificador de la calificacion.
+id_matricula        INT                                     NOT NULL FK -> matricula          Matricula del estudiante calificado.
+id_actividad        INT                                     NOT NULL FK -> actividad          Actividad calificada (si se borra la actividad, se borran sus calificaciones).
+puntaje             DECIMAL(5,2)                            NOT NULL                          Puntos obtenidos por el estudiante; nunca supera el maximo de la actividad.
+                                                            UNIQUE (id_matricula, id_actividad),
+                                                            CHECK (puntaje >= 0 AND puntaje <= 100),
+ON                  DELETE CASCADE                          ON DEL CASCADE                    
+
+--------------------------------------------------------------------------------
+TABLA nota: Resultado consolidado del corte por matricula, asignatura y corte.
+--------------------------------------------------------------------------------
+Campo               Tipo                                    Restriccion                       Descripcion
+--------------------------------------------------------------------------------
+id_nota             INT AUTO_INCREMENT                      PK AUTO_INC                       Identificador de la nota consolidada.
+id_matricula        INT                                     NOT NULL FK -> matricula          Matricula del estudiante.
+id_asignatura       INT                                     NOT NULL FK -> asignatura         Asignatura del corte.
+id_corte            INT                                     NOT NULL FK -> corte              Corte consolidado.
+calif_cuantitativa  DECIMAL(5,2)                                                              Nota del corte como suma de puntos (0 a 100).
+calif_cualitativa   ENUM('AA','AS','AF','AI')                                                 Nivel de logro: AA (90-100), AS (76-89), AF (60-75), AI (menos de 60).
+                                                            UNIQUE (id_matricula, id_asignatura, id_corte),
+
+--------------------------------------------------------------------------------
+TABLA asistencia: Registro de asistencia por asignatura y corte.
+--------------------------------------------------------------------------------
+Campo               Tipo                                    Restriccion                       Descripcion
+--------------------------------------------------------------------------------
+id_asistencia       INT AUTO_INCREMENT                      PK AUTO_INC                       Identificador del registro de asistencia.
+id_matricula        INT                                     NOT NULL FK -> matricula          Matricula del estudiante.
+id_asignatura       INT                                     NOT NULL FK -> asignatura         Asignatura de la clase.
+id_corte            INT                                     NOT NULL FK -> corte              Corte al que pertenece el registro.
+fecha               DATE                                    NOT NULL                          Fecha de la clase.
+estado              ENUM('PRESENTE','AUSENTE','TARDE','JUSTIFICADA')NOT NULL                          Estado de asistencia: PRESENTE, AUSENTE, TARDE o JUSTIFICADA.
+
+--------------------------------------------------------------------------------
+TABLA rendimiento: Resumen del rendimiento academico por grado, ano y modalidad.
+--------------------------------------------------------------------------------
+Campo               Tipo                                    Restriccion                       Descripcion
+--------------------------------------------------------------------------------
+id_rendimiento      INT AUTO_INCREMENT                      PK AUTO_INC                       Identificador del resumen de rendimiento.
+id_grado            INT                                     NOT NULL FK -> grado              Grado resumido.
+anio_lectivo        SMALLINT                                NOT NULL                          Ano lectivo del resumen.
+modalidad           VARCHAR(30)                             NOT NULL DEF 'Regular'            Modalidad del grupo.
+matricula_inicial   INT                                     NOT NULL DEF 0                    Cantidad de estudiantes al inicio del ano.
+matricula_actual    INT                                     NOT NULL DEF 0                    Cantidad de estudiantes activos actualmente.
+aprobados_finales   INT                                     NOT NULL DEF 0                    Asignaturas aprobadas con nota final.
+aprobados_1_2       INT                                     NOT NULL DEF 0                    Aprobadas con uno o dos cortes pendientes.
+aprobados_3_mas     INT                                     NOT NULL DEF 0                    Aprobadas con tres o mas cortes pendientes.
+pct_retencion       DECIMAL(5,2)                            NOT NULL DEF 0                    Porcentaje de retencion escolar.
+                                                            UNIQUE (id_grado, anio_lectivo, modalidad),
+
+================================================================================
+PARTE 2. SCRIPTS SQL DEL PROYECTO (contenido integro de la carpeta sql/)
+================================================================================
+
+Orden de ejecucion para instalar la base desde cero: Script 1 -> 2 -> 3.
+Si ya existe una base de una version anterior, ejecutar solo el Script 4 (migracion).
+
+
+================================================================================
+SCRIPT 1 de 4: 01_sara_esquema.sql
+(crea la base 'sara', las doce tablas y los catalogos iniciales)
+================================================================================
+
+-- =====================================================================
+-- SARA - Cuaderno Digital de Gestion Docente y Automatizacion del
+-- Rendimiento Academico
+-- Script 01: esquema de la base de datos (MySQL 8 / MariaDB 10.x)
+-- La tabla nota queda como el resultado consolidado por corte: la nota del
+-- corte es la SUMA de puntos (0 a 100). La nota final del año es el promedio
+-- de los 4 cortes (25 % cada uno) y se calcula en la aplicacion y en las
+-- =====================================================================
+
+CREATE DATABASE IF NOT EXISTS sara
+    CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+USE sara;
+SET NAMES utf8mb4;
+
+-- ---------------------------------------------------------------------
+-- USUARIO: docentes y administradores del sistema
+-- La clave se guarda como hash SHA-256 (64 caracteres hexadecimales)
+-- ---------------------------------------------------------------------
+CREATE TABLE usuario (
+    id_usuario  INT AUTO_INCREMENT PRIMARY KEY,
+    nombres     VARCHAR(80)  NOT NULL,
+    apellidos   VARCHAR(80)  NOT NULL,
+    usuario     VARCHAR(30)  NOT NULL UNIQUE,
+    clave       CHAR(64)     NOT NULL,
+    rol         ENUM('ADMINISTRADOR','DOCENTE') NOT NULL,
+    activo      TINYINT(1)   NOT NULL DEFAULT 1
+) ENGINE=InnoDB;
+
+-- ---------------------------------------------------------------------
+-- GRADO y SECCION (una seccion pertenece a un grado)
+-- ---------------------------------------------------------------------
+CREATE TABLE grado (
+    id_grado  INT AUTO_INCREMENT PRIMARY KEY,
+    nombre    VARCHAR(40) NOT NULL UNIQUE
+) ENGINE=InnoDB;
+
+CREATE TABLE seccion (
+    id_seccion  INT AUTO_INCREMENT PRIMARY KEY,
+    id_grado    INT NOT NULL,
+    nombre      VARCHAR(10) NOT NULL,
+    UNIQUE (id_grado, nombre),
+    FOREIGN KEY (id_grado) REFERENCES grado(id_grado)
+) ENGINE=InnoDB;
+
+-- ---------------------------------------------------------------------
+-- ESTUDIANTE: lo registra un usuario (relacion "registra")
+-- ---------------------------------------------------------------------
+CREATE TABLE estudiante (
+    id_estudiante    INT AUTO_INCREMENT PRIMARY KEY,
+    codigo           VARCHAR(20)  NOT NULL UNIQUE,
+    nombres          VARCHAR(80)  NOT NULL,
+    apellidos        VARCHAR(80)  NOT NULL,
+    sexo             ENUM('M','F') NOT NULL,
+    fecha_nacimiento DATE,
+    direccion        VARCHAR(200),
+    telefono         VARCHAR(20),
+    id_usuario       INT NOT NULL,
+    FOREIGN KEY (id_usuario) REFERENCES usuario(id_usuario)
+) ENGINE=InnoDB;
+
+-- ---------------------------------------------------------------------
+-- ASIGNATURA y CORTE
+-- ---------------------------------------------------------------------
+CREATE TABLE asignatura (
+    id_asignatura  INT AUTO_INCREMENT PRIMARY KEY,
+    nombre         VARCHAR(60) NOT NULL,
+    regimen        VARCHAR(30) NOT NULL,
+    UNIQUE (nombre, regimen)
+) ENGINE=InnoDB;
+
+CREATE TABLE corte (
+    id_corte     INT AUTO_INCREMENT PRIMARY KEY,
+    nombre       VARCHAR(30) NOT NULL UNIQUE,
+    descripcion  VARCHAR(100)
+) ENGINE=InnoDB;
+
+-- ---------------------------------------------------------------------
+-- MATRICULA: une al estudiante con un grado y seccion en un anio lectivo
+-- Dar de baja a un estudiante = cambiar el estado (no se borra)
+-- ---------------------------------------------------------------------
+CREATE TABLE matricula (
+    id_matricula     INT AUTO_INCREMENT PRIMARY KEY,
+    id_estudiante    INT NOT NULL,
+    id_grado         INT NOT NULL,
+    id_seccion       INT NOT NULL,
+    anio_lectivo     SMALLINT NOT NULL,
+    modalidad        VARCHAR(30) NOT NULL DEFAULT 'Regular',
+    fecha_matricula  DATE NOT NULL,
+    estado           ENUM('ACTIVA','RETIRADA') NOT NULL DEFAULT 'ACTIVA',
+    UNIQUE (id_estudiante, anio_lectivo),
+    FOREIGN KEY (id_estudiante) REFERENCES estudiante(id_estudiante),
+    FOREIGN KEY (id_grado)      REFERENCES grado(id_grado),
+    FOREIGN KEY (id_seccion)    REFERENCES seccion(id_seccion)
+) ENGINE=InnoDB;
+
+-- ---------------------------------------------------------------------
+-- ACTIVIDAD (tabla nueva): actividad evaluativa de un docente para una
+-- asignatura, grado, seccion y corte, con su porcentaje y fecha.
+-- Los porcentajes de un mismo corte deben sumar 100 (lo valida la app).
+-- ---------------------------------------------------------------------
+CREATE TABLE actividad (
+    id_actividad   INT AUTO_INCREMENT PRIMARY KEY,
+    id_usuario     INT NOT NULL,
+    id_asignatura  INT NOT NULL,
+    id_grado       INT NOT NULL,
+    id_seccion     INT NOT NULL,
+    id_corte       INT NOT NULL,
+    anio_lectivo   SMALLINT NOT NULL,
+    nombre         VARCHAR(80) NOT NULL,
+    porcentaje     DECIMAL(5,2) NOT NULL,
+    fecha          DATE,
+    CHECK (porcentaje > 0 AND porcentaje <= 100),
+    FOREIGN KEY (id_usuario)    REFERENCES usuario(id_usuario),
+    FOREIGN KEY (id_asignatura) REFERENCES asignatura(id_asignatura),
+    FOREIGN KEY (id_grado)      REFERENCES grado(id_grado),
+    FOREIGN KEY (id_seccion)    REFERENCES seccion(id_seccion),
+    FOREIGN KEY (id_corte)      REFERENCES corte(id_corte)
+) ENGINE=InnoDB;
+
+-- ---------------------------------------------------------------------
+-- CALIFICACION (tabla nueva): puntaje de un estudiante en una actividad
+-- ---------------------------------------------------------------------
+CREATE TABLE calificacion (
+    id_calificacion  INT AUTO_INCREMENT PRIMARY KEY,
+    id_matricula     INT NOT NULL,
+    id_actividad     INT NOT NULL,
+    puntaje          DECIMAL(5,2) NOT NULL,
+    UNIQUE (id_matricula, id_actividad),
+    CHECK (puntaje >= 0 AND puntaje <= 100),
+    FOREIGN KEY (id_matricula) REFERENCES matricula(id_matricula),
+    FOREIGN KEY (id_actividad) REFERENCES actividad(id_actividad)
+        ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+-- ---------------------------------------------------------------------
+-- NOTA: resultado consolidado por matricula, asignatura y corte
+-- calif_cuantitativa = suma de puntos de las actividades del corte (0 a 100)
+-- calif_cualitativa: AA (90-100), AS (76-89), AF (60-75), AI (< 60)
+-- ---------------------------------------------------------------------
+CREATE TABLE nota (
+    id_nota             INT AUTO_INCREMENT PRIMARY KEY,
+    id_matricula        INT NOT NULL,
+    id_asignatura       INT NOT NULL,
+    id_corte            INT NOT NULL,
+    calif_cuantitativa  DECIMAL(5,2),
+    calif_cualitativa   ENUM('AA','AS','AF','AI'),
+    UNIQUE (id_matricula, id_asignatura, id_corte),
+    FOREIGN KEY (id_matricula)  REFERENCES matricula(id_matricula),
+    FOREIGN KEY (id_asignatura) REFERENCES asignatura(id_asignatura),
+    FOREIGN KEY (id_corte)      REFERENCES corte(id_corte)
+) ENGINE=InnoDB;
+
+-- ---------------------------------------------------------------------
+-- ASISTENCIA
+-- ---------------------------------------------------------------------
+CREATE TABLE asistencia (
+    id_asistencia  INT AUTO_INCREMENT PRIMARY KEY,
+    id_matricula   INT NOT NULL,
+    id_asignatura  INT NOT NULL,
+    id_corte       INT NOT NULL,
+    fecha          DATE NOT NULL,
+    estado         ENUM('PRESENTE','AUSENTE','TARDE','JUSTIFICADA') NOT NULL,
+    FOREIGN KEY (id_matricula)  REFERENCES matricula(id_matricula),
+    FOREIGN KEY (id_asignatura) REFERENCES asignatura(id_asignatura),
+    FOREIGN KEY (id_corte)      REFERENCES corte(id_corte)
+) ENGINE=InnoDB;
+
+-- ---------------------------------------------------------------------
+-- RENDIMIENTO: resumen de rendimiento academico por grado
+-- ---------------------------------------------------------------------
+CREATE TABLE rendimiento (
+    id_rendimiento     INT AUTO_INCREMENT PRIMARY KEY,
+    id_grado           INT NOT NULL,
+    anio_lectivo       SMALLINT NOT NULL,
+    modalidad          VARCHAR(30) NOT NULL DEFAULT 'Regular',
+    matricula_inicial  INT NOT NULL DEFAULT 0,
+    matricula_actual   INT NOT NULL DEFAULT 0,
+    aprobados_finales  INT NOT NULL DEFAULT 0,
+    aprobados_1_2      INT NOT NULL DEFAULT 0,
+    aprobados_3_mas    INT NOT NULL DEFAULT 0,
+    pct_retencion      DECIMAL(5,2) NOT NULL DEFAULT 0,
+    UNIQUE (id_grado, anio_lectivo, modalidad),
+    FOREIGN KEY (id_grado) REFERENCES grado(id_grado)
+) ENGINE=InnoDB;
+
+-- =====================================================================
+-- DATOS INICIALES (catalogos y usuarios de arranque)
+-- =====================================================================
+
+-- Usuarios de arranque (cambiar las claves antes de usar en serio)
+--   admin   / admin123
+--   docente / docente123
+INSERT INTO usuario (nombres, apellidos, usuario, clave, rol) VALUES
+    ('Administrador', 'SARA', 'admin',   SHA2('admin123', 256),   'ADMINISTRADOR'),
+    ('Docente', 'Demostración', 'docente', SHA2('docente123', 256), 'DOCENTE');
+
+-- Cortes evaluativos
+INSERT INTO corte (nombre, descripcion) VALUES
+    ('I Corte',   'Primer corte evaluativo'),
+    ('II Corte',  'Segundo corte evaluativo'),
+    ('III Corte', 'Tercer corte evaluativo'),
+    ('IV Corte',  'Cuarto corte evaluativo');
+
+-- Grados: primaria (1 a 6) y secundaria (7 a 11)
+INSERT INTO grado (nombre) VALUES
+    ('Primer grado'), ('Segundo grado'), ('Tercer grado'), ('Cuarto grado'),
+    ('Quinto grado'), ('Sexto grado'), ('Séptimo grado'), ('Octavo grado'),
+    ('Noveno grado'), ('Décimo grado'), ('Undécimo grado');
+
+-- Secciones A y B para cada grado
+INSERT INTO seccion (id_grado, nombre)
+SELECT g.id_grado, s.letra
+FROM grado g
+CROSS JOIN (SELECT 'A' AS letra UNION ALL SELECT 'B') s;
+
+-- Asignaturas basicas (editables desde el sistema mas adelante)
+INSERT INTO asignatura (nombre, regimen) VALUES
+    ('Lengua y Literatura', 'Primaria'),
+    ('Matemática',          'Primaria'),
+    ('Ciencias Naturales',  'Primaria'),
+    ('Estudios Sociales',   'Primaria'),
+    ('Educación Física',    'Primaria'),
+    ('Lengua y Literatura', 'Secundaria'),
+    ('Matemática',          'Secundaria'),
+    ('Física',              'Secundaria'),
+    ('Química',             'Secundaria'),
+    ('Biología',            'Secundaria'),
+    ('Inglés',              'Secundaria'),
+    ('Educación Física',    'Secundaria');
+
+
+================================================================================
+SCRIPT 2 de 4: 02_sara_datos_prueba.sql
+(datos de prueba: 5 estudiantes de Septimo A con Matematica en los 4 cortes)
+================================================================================
+
+-- =====================================================================
+-- SARA - Script 02: datos de prueba (OPCIONAL)
+-- =====================================================================
+USE sara;
+SET NAMES utf8mb4;
+
+-- Estudiantes registrados por el usuario "docente"
+INSERT INTO estudiante (codigo, nombres, apellidos, sexo, fecha_nacimiento, id_usuario)
+SELECT v.codigo, v.nombres, v.apellidos, v.sexo, v.fecha, u.id_usuario
+FROM usuario u
+JOIN (
+    SELECT 'E-001' AS codigo, 'Ana'    AS nombres, 'Lopez'    AS apellidos, 'F' AS sexo, '2013-03-14' AS fecha UNION ALL
+    SELECT 'E-002', 'Carlos', 'Mendoza',  'M', '2013-07-02' UNION ALL
+    SELECT 'E-003', 'Sofía',  'Rivas',    'F', '2012-11-20' UNION ALL
+    SELECT 'E-004', 'Luis',   'Castillo', 'M', '2013-01-09' UNION ALL
+    SELECT 'E-005', 'María',  'Gómez',    'F', '2013-05-27'
+) v
+WHERE u.usuario = 'docente';
+
+-- Matricula 2026 en Septimo grado, seccion A
+INSERT INTO matricula (id_estudiante, id_grado, id_seccion, anio_lectivo, fecha_matricula)
+SELECT e.id_estudiante, g.id_grado, s.id_seccion, 2026, '2026-02-01'
+FROM estudiante e
+JOIN grado g   ON g.nombre = 'Séptimo grado'
+JOIN seccion s ON s.id_grado = g.id_grado AND s.nombre = 'A'
+WHERE e.codigo IN ('E-001', 'E-002', 'E-003', 'E-004', 'E-005');
+
+-- Actividades de Matematica (secundaria): las mismas 3 en los 4 cortes
+INSERT INTO actividad (id_usuario, id_asignatura, id_grado, id_seccion, id_corte,
+                       anio_lectivo, nombre, porcentaje, fecha)
+SELECT u.id_usuario, a.id_asignatura, g.id_grado, s.id_seccion, c.id_corte,
+       2026, v.nombre, v.porcentaje, v.fecha
+FROM usuario u
+JOIN asignatura a ON a.nombre = 'Matemática' AND a.regimen = 'Secundaria'
+JOIN grado g      ON g.nombre = 'Séptimo grado'
+JOIN seccion s    ON s.id_grado = g.id_grado AND s.nombre = 'A'
+JOIN corte c
+JOIN (
+    SELECT 'Quiz 1' AS nombre, 20.00 AS porcentaje, '2026-03-10' AS fecha UNION ALL
+    SELECT 'Tarea',  30.00, '2026-03-20' UNION ALL
+    SELECT 'Examen', 50.00, '2026-04-05'
+) v
+WHERE u.usuario = 'docente';
+
+-- Calificaciones: cada estudiante tiene un rendimiento base (fraccion de los
+-- puntos maximos) que varia un poco por actividad y por corte.
+-- puntaje = maximo de la actividad x fraccion  (nunca pasa del maximo)
+INSERT INTO calificacion (id_matricula, id_actividad, puntaje)
+SELECT m.id_matricula, a.id_actividad,
+       ROUND(a.porcentaje * LEAST(1, GREATEST(0, p.base + v.ajuste_actividad + w.ajuste_corte)), 2)
+FROM (
+    SELECT 'E-001' AS codigo, 0.95 AS base UNION ALL
+    SELECT 'E-002', 0.82 UNION ALL
+    SELECT 'E-003', 0.70 UNION ALL
+    SELECT 'E-004', 0.52 UNION ALL
+    SELECT 'E-005', 0.88
+) p
+JOIN estudiante e ON e.codigo = p.codigo
+JOIN matricula m  ON m.id_estudiante = e.id_estudiante AND m.anio_lectivo = 2026
+JOIN actividad a  ON a.id_grado = m.id_grado AND a.id_seccion = m.id_seccion
+                 AND a.anio_lectivo = m.anio_lectivo
+JOIN asignatura asig ON asig.id_asignatura = a.id_asignatura
+                    AND asig.nombre = 'Matemática' AND asig.regimen = 'Secundaria'
+JOIN corte c      ON c.id_corte = a.id_corte
+JOIN (
+    SELECT 'Quiz 1' AS nombre, -0.03 AS ajuste_actividad UNION ALL
+    SELECT 'Tarea',   0.02 UNION ALL
+    SELECT 'Examen', -0.01
+) v ON v.nombre = a.nombre
+JOIN (
+    SELECT 'I Corte' AS corte, 0.00 AS ajuste_corte UNION ALL
+    SELECT 'II Corte',  0.02 UNION ALL
+    SELECT 'III Corte', -0.03 UNION ALL
+    SELECT 'IV Corte',  0.01
+) w ON w.corte = c.nombre
+WHERE NOT (p.codigo = 'E-005' AND c.nombre = 'IV Corte');
+
+-- Nota de cada corte = suma de los puntos de sus actividades
+INSERT INTO nota (id_matricula, id_asignatura, id_corte, calif_cuantitativa, calif_cualitativa)
+SELECT t.id_matricula, t.id_asignatura, t.id_corte, t.total,
+       CASE WHEN t.total >= 90 THEN 'AA'
+            WHEN t.total >= 76 THEN 'AS'
+            WHEN t.total >= 60 THEN 'AF'
+            ELSE 'AI' END
+FROM (SELECT c.id_matricula, a.id_asignatura, a.id_corte, ROUND(SUM(c.puntaje), 2) AS total
+      FROM calificacion c
+      JOIN actividad a ON a.id_actividad = c.id_actividad
+      GROUP BY c.id_matricula, a.id_asignatura, a.id_corte) t;
+
+-- ---------------------------------------------------------------------
+-- Consulta de prueba: nota de cada corte y nota final por estudiante
+-- nota final = promedio de los 4 cortes (cada corte aporta 25 %)
+-- ---------------------------------------------------------------------
+SELECT e.codigo,
+       CONCAT(e.nombres, ' ', e.apellidos) AS estudiante,
+       MAX(CASE WHEN c.nombre = 'I Corte'   THEN n.calif_cuantitativa END) AS i_corte,
+       MAX(CASE WHEN c.nombre = 'II Corte'  THEN n.calif_cuantitativa END) AS ii_corte,
+       MAX(CASE WHEN c.nombre = 'III Corte' THEN n.calif_cuantitativa END) AS iii_corte,
+       MAX(CASE WHEN c.nombre = 'IV Corte'  THEN n.calif_cuantitativa END) AS iv_corte,
+       CASE WHEN COUNT(*) = 4 THEN ROUND(SUM(n.calif_cuantitativa) / 4, 2) END AS nota_final
+FROM nota n
+JOIN corte c      ON c.id_corte = n.id_corte
+JOIN matricula m  ON m.id_matricula = n.id_matricula
+JOIN estudiante e ON e.id_estudiante = m.id_estudiante
+WHERE e.codigo LIKE 'E-00_'
+GROUP BY e.id_estudiante, e.codigo, e.nombres, e.apellidos
+ORDER BY e.codigo;
+
+
+================================================================================
+SCRIPT 3 de 4: 03_sara_consultas.sql
+(las consultas SQL que usa el sistema, comentadas para estudio)
+================================================================================
+
+-- =====================================================================
+-- SARA - Script 03: consultas SQL principales
+-- Son las mismas consultas que usa el sistema (en las clases DAO).
+-- Antes de ejecutarlas se eligen los datos del grupo en las variables.
+-- Requiere MySQL 8 o MariaDB 10.2 o superior (usa RANK()).
+-- =====================================================================
+USE sara;
+SET NAMES utf8mb4;
+
+-- Variables: cambiar segun el grupo que se quiere consultar
+SET @anio       = 2026;
+SET @id_grado   = (SELECT id_grado FROM grado WHERE nombre = 'Séptimo grado');
+SET @id_seccion = (SELECT id_seccion FROM seccion WHERE id_grado = @id_grado AND nombre = 'A');
+SET @id_asig    = (SELECT id_asignatura FROM asignatura WHERE nombre = 'Matemática' AND regimen = 'Secundaria');
+SET @id_corte   = (SELECT id_corte FROM corte WHERE nombre = 'I Corte');
+
+-- ---------------------------------------------------------------------
+-- 1) Estudiantes activos por grupo (grado y seccion) en un anio
+-- ---------------------------------------------------------------------
+SELECT g.nombre AS grado, s.nombre AS seccion, COUNT(m.id_matricula) AS estudiantes_activos
+FROM seccion s
+JOIN grado g ON g.id_grado = s.id_grado
+LEFT JOIN matricula m ON m.id_seccion = s.id_seccion
+                     AND m.anio_lectivo = @anio AND m.estado = 'ACTIVA'
+GROUP BY g.id_grado, g.nombre, s.nombre
+HAVING COUNT(m.id_matricula) > 0
+ORDER BY g.id_grado, s.nombre;
+
+-- ---------------------------------------------------------------------
+-- 2) Actividades de un corte y suma de sus puntos maximos (debe ser 100)
+-- ---------------------------------------------------------------------
+SELECT a.nombre AS actividad, a.porcentaje, a.fecha
+FROM actividad a
+WHERE a.id_grado = @id_grado AND a.id_seccion = @id_seccion AND a.id_asignatura = @id_asig
+  AND a.id_corte = @id_corte AND a.anio_lectivo = @anio
+ORDER BY a.fecha, a.id_actividad;
+
+-- Cortes cuyos puntos maximos NO suman 100 (para revisar configuraciones incompletas)
+SELECT g.nombre AS grado, s.nombre AS seccion, asig.nombre AS asignatura, c.nombre AS corte,
+       SUM(a.porcentaje) AS suma_porcentajes
+FROM actividad a
+JOIN grado g       ON g.id_grado = a.id_grado
+JOIN seccion s     ON s.id_seccion = a.id_seccion
+JOIN asignatura asig ON asig.id_asignatura = a.id_asignatura
+JOIN corte c       ON c.id_corte = a.id_corte
+WHERE a.anio_lectivo = @anio
+GROUP BY a.id_usuario, g.nombre, s.nombre, asig.nombre, c.nombre, a.id_grado, a.id_seccion,
+         a.id_asignatura, a.id_corte
+HAVING SUM(a.porcentaje) <> 100;
+
+-- ---------------------------------------------------------------------
+-- 3) Nota del corte y nivel de logro de cada estudiante
+--    nota del corte = suma de los puntos de sus actividades (0 a 100)
+--    aporte a la final = nota del corte x 25 / 100
+-- ---------------------------------------------------------------------
+SELECT e.codigo,
+       CONCAT(e.nombres, ' ', e.apellidos) AS estudiante,
+       ROUND(SUM(c.puntaje), 2) AS nota_del_corte,
+       ROUND(SUM(c.puntaje) * 25 / 100, 2) AS aporte_a_la_final,
+       CASE
+           WHEN SUM(c.puntaje) >= 90 THEN 'AA'
+           WHEN SUM(c.puntaje) >= 76 THEN 'AS'
+           WHEN SUM(c.puntaje) >= 60 THEN 'AF'
+           ELSE 'AI'
+       END AS nivel_logro
+FROM calificacion c
+JOIN actividad a  ON a.id_actividad = c.id_actividad
+JOIN matricula m  ON m.id_matricula = c.id_matricula
+JOIN estudiante e ON e.id_estudiante = m.id_estudiante
+WHERE a.id_grado = @id_grado AND a.id_seccion = @id_seccion AND a.id_asignatura = @id_asig
+  AND a.id_corte = @id_corte AND a.anio_lectivo = @anio AND m.estado = 'ACTIVA'
+GROUP BY e.id_estudiante, e.codigo, e.nombres, e.apellidos
+ORDER BY e.apellidos, e.nombres;
+
+-- ---------------------------------------------------------------------
+-- 4) Ranking del grupo (los empates comparten posicion)
+-- ---------------------------------------------------------------------
+SELECT RANK() OVER (ORDER BY n.calif_cuantitativa DESC) AS posicion,
+       e.codigo,
+       CONCAT(e.nombres, ' ', e.apellidos) AS estudiante,
+       n.calif_cuantitativa AS nota_del_corte,
+       n.calif_cualitativa  AS nivel
+FROM nota n
+JOIN matricula m  ON m.id_matricula = n.id_matricula
+JOIN estudiante e ON e.id_estudiante = m.id_estudiante
+WHERE m.id_grado = @id_grado AND m.id_seccion = @id_seccion AND m.anio_lectivo = @anio
+  AND m.estado = 'ACTIVA' AND n.id_asignatura = @id_asig AND n.id_corte = @id_corte
+ORDER BY posicion, e.apellidos;
+
+-- ---------------------------------------------------------------------
+-- 5) Alumnos en riesgo academico: nota del corte menor a 60
+-- ---------------------------------------------------------------------
+SELECT e.codigo, CONCAT(e.nombres, ' ', e.apellidos) AS estudiante,
+       asig.nombre AS asignatura, n.calif_cuantitativa AS nota_del_corte, n.calif_cualitativa AS nivel
+FROM nota n
+JOIN matricula m     ON m.id_matricula = n.id_matricula
+JOIN estudiante e    ON e.id_estudiante = m.id_estudiante
+JOIN asignatura asig ON asig.id_asignatura = n.id_asignatura
+WHERE m.id_grado = @id_grado AND m.id_seccion = @id_seccion AND m.anio_lectivo = @anio
+  AND m.estado = 'ACTIVA' AND n.id_corte = @id_corte AND n.calif_cuantitativa < 60
+ORDER BY e.apellidos, e.nombres, asig.nombre;
+
+-- ---------------------------------------------------------------------
+-- 6) Boletin de la seccion: nota de cada corte, acumulado, nota final y letra
+--    nota final = promedio de los 4 cortes (25 % cada uno); solo existe si
+--    el estudiante ya tiene los 4 cortes con nota. Si no, queda NULL (En proceso).
+--    Para un solo estudiante agregar:  AND e.codigo = 'E-001'
+-- ---------------------------------------------------------------------
+SELECT t.codigo, t.estudiante, t.asignatura,
+       t.i_corte, t.ii_corte, t.iii_corte, t.iv_corte,
+       t.acumulado, t.nota_final,
+       CASE WHEN t.nota_final IS NULL THEN NULL
+            WHEN t.nota_final >= 90 THEN 'AA'
+            WHEN t.nota_final >= 76 THEN 'AS'
+            WHEN t.nota_final >= 60 THEN 'AF'
+            ELSE 'AI' END AS nivel,
+       CASE WHEN t.nota_final IS NULL THEN NULL
+            WHEN t.nota_final >= 60 THEN 'Aprobada'
+            ELSE 'Reprobada' END AS resultado
+FROM (SELECT e.codigo,
+             CONCAT(e.nombres, ' ', e.apellidos) AS estudiante,
+             e.apellidos, e.nombres,
+             asig.nombre AS asignatura,
+             MAX(CASE WHEN c.nombre = 'I Corte'   THEN n.calif_cuantitativa END) AS i_corte,
+             MAX(CASE WHEN c.nombre = 'II Corte'  THEN n.calif_cuantitativa END) AS ii_corte,
+             MAX(CASE WHEN c.nombre = 'III Corte' THEN n.calif_cuantitativa END) AS iii_corte,
+             MAX(CASE WHEN c.nombre = 'IV Corte'  THEN n.calif_cuantitativa END) AS iv_corte,
+             ROUND(SUM(n.calif_cuantitativa) / 4, 2) AS acumulado,
+             CASE WHEN COUNT(*) = 4 THEN ROUND(SUM(n.calif_cuantitativa) / 4, 2) END AS nota_final
+      FROM nota n
+      JOIN corte c         ON c.id_corte = n.id_corte
+      JOIN matricula m     ON m.id_matricula = n.id_matricula
+      JOIN estudiante e    ON e.id_estudiante = m.id_estudiante
+      JOIN asignatura asig ON asig.id_asignatura = n.id_asignatura
+      WHERE m.id_grado = @id_grado AND m.id_seccion = @id_seccion AND m.anio_lectivo = @anio
+        AND m.estado = 'ACTIVA'
+      GROUP BY e.id_estudiante, e.codigo, e.nombres, e.apellidos, asig.id_asignatura, asig.nombre) t
+ORDER BY t.apellidos, t.nombres, t.asignatura;
+
+-- ---------------------------------------------------------------------
+-- 7) Promedio del grupo (de las notas de corte) por asignatura y corte
+-- ---------------------------------------------------------------------
+SELECT asig.nombre AS asignatura, c.nombre AS corte,
+       ROUND(AVG(n.calif_cuantitativa), 2) AS promedio_del_grupo,
+       COUNT(*) AS estudiantes_con_nota
+FROM nota n
+JOIN matricula m     ON m.id_matricula = n.id_matricula
+JOIN asignatura asig ON asig.id_asignatura = n.id_asignatura
+JOIN corte c         ON c.id_corte = n.id_corte
+WHERE m.id_grado = @id_grado AND m.id_seccion = @id_seccion AND m.anio_lectivo = @anio
+  AND m.estado = 'ACTIVA'
+GROUP BY asig.id_asignatura, asig.nombre, c.id_corte, c.nombre
+ORDER BY asig.nombre, c.id_corte;
+
+-- ---------------------------------------------------------------------
+-- 8) Cantidad de estudiantes por nivel de logro (distribucion del grupo)
+-- ---------------------------------------------------------------------
+SELECT n.calif_cualitativa AS nivel, COUNT(*) AS estudiantes
+FROM nota n
+JOIN matricula m ON m.id_matricula = n.id_matricula
+WHERE m.id_grado = @id_grado AND m.id_seccion = @id_seccion AND m.anio_lectivo = @anio
+  AND m.estado = 'ACTIVA' AND n.id_asignatura = @id_asig AND n.id_corte = @id_corte
+GROUP BY n.calif_cualitativa
+ORDER BY FIELD(n.calif_cualitativa, 'AA', 'AS', 'AF', 'AI');
+
+-- ---------------------------------------------------------------------
+-- 9) Rendimiento del grado: asignaturas reprobadas por estudiante
+--    Una asignatura se reprueba si su nota final (promedio de los 4 cortes)
+--    es menor a 60. Solo cuentan las asignaturas con los 4 cortes ya calificados.
+-- ---------------------------------------------------------------------
+SELECT m.modalidad,
+       COUNT(*) AS estudiantes_con_notas,
+       SUM(CASE WHEN r.reprobadas = 0 THEN 1 ELSE 0 END)               AS aprobaron_todas,
+       SUM(CASE WHEN r.reprobadas BETWEEN 1 AND 2 THEN 1 ELSE 0 END)   AS reprobaron_1_o_2,
+       SUM(CASE WHEN r.reprobadas >= 3 THEN 1 ELSE 0 END)              AS reprobaron_3_o_mas
+FROM matricula m
+JOIN (SELECT x.id_matricula,
+             SUM(CASE WHEN x.nota_final < 60 THEN 1 ELSE 0 END) AS reprobadas
+      FROM (SELECT id_matricula, id_asignatura,
+                   ROUND(SUM(calif_cuantitativa) / 4, 2) AS nota_final
+            FROM nota GROUP BY id_matricula, id_asignatura
+            HAVING COUNT(*) = 4) x
+      GROUP BY x.id_matricula) r ON r.id_matricula = m.id_matricula
+WHERE m.id_grado = @id_grado AND m.anio_lectivo = @anio AND m.estado = 'ACTIVA'
+GROUP BY m.modalidad;
+
+-- ---------------------------------------------------------------------
+-- 10) Retencion: matricula inicial vs matricula actual por grado
+-- ---------------------------------------------------------------------
+SELECT g.nombre AS grado,
+       COUNT(*) AS matricula_inicial,
+       SUM(CASE WHEN m.estado = 'ACTIVA' THEN 1 ELSE 0 END) AS matricula_actual,
+       ROUND(SUM(CASE WHEN m.estado = 'ACTIVA' THEN 1 ELSE 0 END) * 100 / COUNT(*), 2) AS pct_retencion
+FROM matricula m
+JOIN grado g ON g.id_grado = m.id_grado
+WHERE m.anio_lectivo = @anio
+GROUP BY g.id_grado, g.nombre
+ORDER BY g.id_grado;
+
+
+================================================================================
+SCRIPT 4 de 4: 04_sara_migracion_v5.sql
+(migracion de la version anterior: agrega el IV corte sin borrar la base)
+================================================================================
+
+-- =====================================================================
+-- SARA - Script 04: MIGRACION a la version 5 (OPCIONAL)
+-- Para quien YA tiene la base "sara" creada con el script 01 de la v4
+-- y no quiere perder sus datos. Si va a crear la base desde cero, NO
+-- hace falta: el script 01 nuevo ya trae todo.
+--
+-- Que hace:
+--   1) Agrega el IV Corte (si no existe).
+--   2) Convierte los datos de ejemplo de Septimo A (Matematica) de la
+--      escala vieja (0 a 100) a puntos, solo si todavia no estan convertidos.
+--   3) Recalcula la tabla nota: la nota de cada corte pasa a ser la
+--      SUMA de puntos (antes era un promedio ponderado).
+--
+-- Tus puntajes de Segundo C (8, 13, 22, 20, 15...) ya estan en puntos:
+-- no se tocan, solo se recalcula su total.
+-- Se puede ejecutar mas de una vez sin danar nada.
+-- =====================================================================
+USE sara;
+SET NAMES utf8mb4;
+SET SQL_SAFE_UPDATES = 0;
+
+-- 1) IV Corte
+INSERT INTO corte (nombre, descripcion)
+SELECT 'IV Corte', 'Cuarto corte evaluativo'
+WHERE NOT EXISTS (SELECT 1 FROM corte WHERE nombre = 'IV Corte');
+
+-- 2) Datos de ejemplo viejos (E-001 a E-005, Matematica de Septimo A):
+--    tenian notas de 0 a 100 en actividades de 20 / 30 / 50 %.
+--    Si alguna pasa del maximo de su actividad, se convierten todas a puntos.
+SET @sin_convertir = (
+    SELECT COUNT(*)
+    FROM calificacion c
+    JOIN actividad a     ON a.id_actividad = c.id_actividad
+    JOIN asignatura asig ON asig.id_asignatura = a.id_asignatura
+    JOIN grado g         ON g.id_grado = a.id_grado
+    JOIN seccion s       ON s.id_seccion = a.id_seccion
+    JOIN matricula m     ON m.id_matricula = c.id_matricula
+    JOIN estudiante e    ON e.id_estudiante = m.id_estudiante
+    WHERE asig.nombre = 'Matemática' AND asig.regimen = 'Secundaria'
+      AND g.nombre = 'Séptimo grado' AND s.nombre = 'A'
+      AND e.codigo IN ('E-001', 'E-002', 'E-003', 'E-004', 'E-005')
+      AND a.nombre IN ('Quiz 1', 'Tarea', 'Examen')
+      AND c.puntaje > a.porcentaje
+);
+
+UPDATE calificacion c
+JOIN actividad a     ON a.id_actividad = c.id_actividad
+JOIN asignatura asig ON asig.id_asignatura = a.id_asignatura
+JOIN grado g         ON g.id_grado = a.id_grado
+JOIN seccion s       ON s.id_seccion = a.id_seccion
+JOIN matricula m     ON m.id_matricula = c.id_matricula
+JOIN estudiante e    ON e.id_estudiante = m.id_estudiante
+SET c.puntaje = ROUND(c.puntaje * a.porcentaje / 100, 2)
+WHERE @sin_convertir > 0
+  AND asig.nombre = 'Matemática' AND asig.regimen = 'Secundaria'
+  AND g.nombre = 'Séptimo grado' AND s.nombre = 'A'
+  AND e.codigo IN ('E-001', 'E-002', 'E-003', 'E-004', 'E-005')
+  AND a.nombre IN ('Quiz 1', 'Tarea', 'Examen');
+
+-- Revision: calificaciones que todavia pasan del maximo de su actividad.
+-- Si esta consulta devuelve filas, son notas tuyas que hay que corregir
+-- en el registro de notas (no se corrigen solas).
+SELECT e.codigo, CONCAT(e.nombres, ' ', e.apellidos) AS estudiante,
+       a.nombre AS actividad, a.porcentaje AS maximo, c.puntaje
+FROM calificacion c
+JOIN actividad a  ON a.id_actividad = c.id_actividad
+JOIN matricula m  ON m.id_matricula = c.id_matricula
+JOIN estudiante e ON e.id_estudiante = m.id_estudiante
+WHERE c.puntaje > a.porcentaje;
+
+-- 3) Recalcular toda la tabla nota desde las calificaciones
+--    (nota del corte = suma de puntos)
+DELETE FROM nota;
+
+INSERT INTO nota (id_matricula, id_asignatura, id_corte, calif_cuantitativa, calif_cualitativa)
+SELECT t.id_matricula, t.id_asignatura, t.id_corte, t.total,
+       CASE WHEN t.total >= 90 THEN 'AA'
+            WHEN t.total >= 76 THEN 'AS'
+            WHEN t.total >= 60 THEN 'AF'
+            ELSE 'AI' END
+FROM (SELECT c.id_matricula, a.id_asignatura, a.id_corte, ROUND(SUM(c.puntaje), 2) AS total
+      FROM calificacion c
+      JOIN actividad a ON a.id_actividad = c.id_actividad
+      GROUP BY c.id_matricula, a.id_asignatura, a.id_corte) t;
+
+SET SQL_SAFE_UPDATES = 1;
+
+-- Resultado: cuantas notas quedaron y los cortes disponibles
+SELECT (SELECT COUNT(*) FROM nota)  AS notas_recalculadas,
+       (SELECT GROUP_CONCAT(nombre ORDER BY id_corte SEPARATOR ', ') FROM corte) AS cortes;
