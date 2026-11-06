@@ -1,8 +1,8 @@
 @echo off
-title Cargando Proyecto Java + MySQL...
+title Cargando Sistema SARA...
 cls
 echo ===================================================
-echo   CONFIGURANDO E INICIANDO EL PROYECTO (ECLIPSE)   
+echo   CONFIGURANDO E INICIANDO EL PROYECTO (MAVEN)   
 echo ===================================================
 echo.
 
@@ -18,16 +18,9 @@ mysql -u %MYSQL_USER% -p%DB_PASS% -e "CREATE DATABASE IF NOT EXISTS %DB_NAME%;"
 echo [2/3] Importando tablas y datos desde schema.sql...
 mysql -u %MYSQL_USER% -p%DB_PASS% %DB_NAME% < schema.sql
 
-echo [3/3] Compilando y ejecutando la aplicacion Java...
-:: Eclipse compila por defecto en la carpeta 'bin'. 
-:: Buscamos todos los archivos .java de src, los compilamos en bin y ejecutamos la clase principal.
-
-if not exist bin mkdir bin
-javac -d bin -sourcepath src src/*.java
-
-:: NOTA: Reemplaza "Principal" por el nombre de tu clase que tiene el metodo main (ej: Login, Menu, etc.)
-:: Si tu clase principal esta dentro de un paquete, usa: java -cp bin paquete.ClasePrincipal
-java -cp bin;lib/* Principal
+echo [3/3] Compilando y ejecutando la aplicacion con Maven...
+:: Al ser un proyecto Maven, usamos el comando oficial exec:java apuntando a tu clase sara.Main
+call mvn clean compile exec:java -Dexec.mainClass="sara.Main"
 
 echo.
 echo Proceso finalizado.
