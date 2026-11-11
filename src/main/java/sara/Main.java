@@ -1,5 +1,5 @@
 package sara;
-
+//Revisado por YAAB 11.11.2026
 import javax.swing.SwingUtilities;
 import javax.swing.UIManager;
 
